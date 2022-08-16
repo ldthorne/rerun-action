@@ -91,12 +91,12 @@ const getNumberOfAttemptsFromUser = async (): Promise<number> => {
 }
 
 
-const sleepUntilAttemptCompleted = async ({runId, attemptNumber, pollFrequencyMs = 10000}: {runId: number, attemptNumber: number, pollFrequencyMs: number}) => {
+const sleepUntilAttemptCompleted = async ({runId, attemptNumber, pollFrequencyMs }: {runId: number, attemptNumber: number, pollFrequencyMs: number}) => {
   const attempt = await getAttempt(runId, attemptNumber);
   if (attempt.status === 'completed') {
     return;
   }
-  await sleep(10000);
+  await sleep(pollFrequencyMs);
   await sleepUntilAttemptCompleted({runId, attemptNumber, pollFrequencyMs});
 }
 
