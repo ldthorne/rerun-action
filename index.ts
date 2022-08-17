@@ -333,7 +333,7 @@ const main = async () => {
     if (finishedAttempt.conclusion === "success") {
       successes++;
     } else if (finishedAttempt.conclusion === "failure") {
-      downloadArtifactsForFailedAttempt({
+      await downloadArtifactsForFailedAttempt({
         runId: RUN_ID,
         attemptNumber: expectedAttemptCount,
         repoName: REPO_NAME,
