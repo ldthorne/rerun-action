@@ -114,7 +114,9 @@ const downloadFile = async ({
   const response = await fetch(url);
 
   if (!response.ok || !response.body) {
-    throw new Error(`Unexpected response while downloading file ${response.statusText}`);
+    throw new Error(
+      `Unexpected response while downloading file ${response.statusText}`
+    );
   }
 
   await streamPipeline(response.body, fs.createWriteStream(saveToPath));
@@ -154,7 +156,6 @@ const downloadArtifactsForFailedAttempt = async ({
       }
     );
 
-
     if (!artifactRes.url) {
       throw new Error("No download url returned");
     }
@@ -162,7 +163,7 @@ const downloadArtifactsForFailedAttempt = async ({
     const fileName = `${artifact.name}.zip`;
     const artifactFilePath = `./artifacts/runs/${runId}/attempts/${attemptNumber}/`;
 
-    await fs.promises.mkdir(artifactFilePath, { recursive: true })
+    await fs.promises.mkdir(artifactFilePath, { recursive: true });
 
     await downloadFile({
       url: artifactRes.url,
@@ -242,7 +243,9 @@ const main = async () => {
 
     const finishedAttempt = await getAttempt(RUN_ID, expectedAttemptCount);
 
-    console.log(`Attempt ${expectedAttemptCount} finished with conclusion ${finishedAttempt.conclusion}`);
+    console.log(
+      `Attempt ${expectedAttemptCount} finished with conclusion ${finishedAttempt.conclusion}`
+    );
 
     if (finishedAttempt.conclusion === "success") {
       successes++;
