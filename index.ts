@@ -242,6 +242,8 @@ const main = async () => {
 
     const finishedAttempt = await getAttempt(RUN_ID, expectedAttemptCount);
 
+    console.log(`Attempt ${expectedAttemptCount} finished with conclusion ${finishedAttempt.conclusion}`);
+
     if (finishedAttempt.conclusion === "success") {
       successes++;
     } else if (finishedAttempt.conclusion === "failure") {
@@ -251,7 +253,7 @@ const main = async () => {
       });
       failures++;
     } else {
-      console.log("Unknown conclusion", finishedAttempt.conclusion);
+      console.error("Unknown conclusion", finishedAttempt.conclusion);
     }
 
     console.log(
