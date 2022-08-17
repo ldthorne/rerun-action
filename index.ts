@@ -32,12 +32,22 @@ const sleep = (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const getAttempt = async (runId: number, attemptNumber: number) => {
+const getAttempt = async ({
+  runId,
+  attemptNumber,
+  repoName,
+  repoOwner,
+}: {
+  runId: number;
+  attemptNumber: number;
+  repoName: string;
+  repoOwner: string;
+}) => {
   const currentAttemptRes = await octokit.request(
     "GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}",
     {
-      owner: "headway",
-      repo: "headway",
+      owner: repoOwner,
+      repo: repoName,
       run_id: runId,
       attempt_number: attemptNumber,
     }
@@ -46,13 +56,21 @@ const getAttempt = async (runId: number, attemptNumber: number) => {
   return currentAttemptRes.data;
 };
 
-const getRun = async (runId: number) => {
+const getRun = async ({
+  runId,
+  repoName,
+  repoOwner,
+}: {
+  runId: number;
+  repoName: string;
+  repoOwner: string;
+}) => {
   try {
     const res = await octokit.request(
       "GET /repos/{owner}/{repo}/actions/runs/{run_id}",
       {
-        owner: "headway",
-        repo: "headway",
+        owner: repoOwner,
+        repo: repoName,
         run_id: runId,
       }
     );
@@ -102,6 +120,29 @@ const getNumberOfAttemptsFromUser = async (): Promise<number> => {
   return parseInt(numAttempts);
 };
 
+const getRepoFromUser = async (): Promise<string> => {
+  if (process.env.GITHUB_REPOSITORY_NAME) {
+    return process.env.GITHUB_REPOSITORY_NAME;
+  }
+
+  const repo = await readLineAsync("Enter repository name: ");
+  if (!repo) {
+    return await getRepoFromUser();
+  }
+  return repo;
+};
+
+const getRepoOwnerFromUser = async (): Promise<string> => {
+  if (process.env.GITHUB_REPOSITORY_OWNER) {
+    return process.env.GITHUB_REPOSITORY_OWNER;
+  }
+  const repoOwner = await readLineAsync("Enter repository's owner: ");
+  if (!repoOwner) {
+    return await getRepoOwnerFromUser();
+  }
+  return repoOwner;
+};
+
 const downloadFile = async ({
   url,
   saveToPath,
@@ -125,18 +166,27 @@ const downloadFile = async ({
 const downloadArtifactsForFailedAttempt = async ({
   runId,
   attemptNumber,
+  repoName,
+  repoOwner,
 }: {
   runId: number;
   attemptNumber: number;
+  repoName: string;
+  repoOwner: string;
 }) => {
   console.log(`Downloading artifacts for failed attempt #${attemptNumber}`);
-  const attempt = await getAttempt(runId, attemptNumber);
+  const attempt = await getAttempt({
+    runId,
+    attemptNumber,
+    repoName,
+    repoOwner,
+  });
 
   const artifactsRes = await octokit.request(
     "GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts",
     {
-      owner: "headway",
-      repo: "headway",
+      owner: repoOwner,
+      repo: repoName,
       run_id: attempt.id,
     }
   );
@@ -149,8 +199,8 @@ const downloadArtifactsForFailedAttempt = async ({
     const artifactRes = await octokit.request(
       "GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}",
       {
-        owner: "headway",
-        repo: "headway",
+        owner: repoOwner,
+        repo: repoName,
         artifact_id: artifact.id,
         archive_format: "zip",
       }
@@ -176,17 +226,32 @@ const sleepUntilAttemptCompleted = async ({
   runId,
   attemptNumber,
   pollFrequencyMs,
+  repoName,
+  repoOwner,
 }: {
   runId: number;
   attemptNumber: number;
   pollFrequencyMs: number;
+  repoName: string;
+  repoOwner: string;
 }) => {
-  const attempt = await getAttempt(runId, attemptNumber);
+  const attempt = await getAttempt({
+    runId,
+    attemptNumber,
+    repoName,
+    repoOwner,
+  });
   if (attempt.status === "completed") {
     return;
   }
   await sleep(pollFrequencyMs);
-  await sleepUntilAttemptCompleted({ runId, attemptNumber, pollFrequencyMs });
+  await sleepUntilAttemptCompleted({
+    runId,
+    attemptNumber,
+    pollFrequencyMs,
+    repoName,
+    repoOwner,
+  });
 };
 
 const main = async () => {
@@ -196,8 +261,14 @@ const main = async () => {
   const RUN_ID = await getRunIdFromUser();
   const POLL_FREQUENCY_MS = await getPollFrequencyFromUser();
   const NUMBER_OF_ATTEMPTS = await getNumberOfAttemptsFromUser();
+  const REPO_NAME = await getRepoFromUser();
+  const REPO_OWNER = await getRepoOwnerFromUser();
 
-  const initialRun = await getRun(RUN_ID);
+  const initialRun = await getRun({
+    runId: RUN_ID,
+    repoName: REPO_NAME,
+    repoOwner: REPO_OWNER,
+  });
 
   if (!initialRun) {
     throw new Error("Could not find run");
@@ -213,8 +284,8 @@ const main = async () => {
     await octokit.request(
       "POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun",
       {
-        owner: "headway",
-        repo: "headway",
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
         run_id: RUN_ID,
       }
     );
@@ -223,7 +294,12 @@ const main = async () => {
 
     const expectedAttemptCount = initialAttemptCount + iteration;
 
-    const currentAttempt = await getAttempt(RUN_ID, expectedAttemptCount);
+    const currentAttempt = await getAttempt({
+      runId: RUN_ID,
+      attemptNumber: expectedAttemptCount,
+      repoName: REPO_NAME,
+      repoOwner: REPO_OWNER,
+    });
 
     if (!currentAttempt) {
       throw new Error(
@@ -239,9 +315,16 @@ const main = async () => {
       runId: RUN_ID,
       attemptNumber: expectedAttemptCount,
       pollFrequencyMs: POLL_FREQUENCY_MS,
+      repoName: REPO_NAME,
+      repoOwner: REPO_OWNER,
     });
 
-    const finishedAttempt = await getAttempt(RUN_ID, expectedAttemptCount);
+    const finishedAttempt = await getAttempt({
+      runId: RUN_ID,
+      attemptNumber: expectedAttemptCount,
+      repoName: REPO_NAME,
+      repoOwner: REPO_OWNER,
+    });
 
     console.log(
       `Attempt ${expectedAttemptCount} finished with conclusion ${finishedAttempt.conclusion}`
@@ -253,6 +336,8 @@ const main = async () => {
       downloadArtifactsForFailedAttempt({
         runId: RUN_ID,
         attemptNumber: expectedAttemptCount,
+        repoName: REPO_NAME,
+        repoOwner: REPO_OWNER,
       });
       failures++;
     } else {
